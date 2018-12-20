@@ -12,6 +12,8 @@
 
 using namespace std;
 
+bool DEBUG = false;
+
 // for convenience
 using json = nlohmann::json;
 
@@ -207,7 +209,7 @@ int main() {
   // reference velocity
   double ref_vel = 49.5; //mph
 
-  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &DEBUG](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -224,6 +226,7 @@ int main() {
         string event = j[0].get<string>();
         
         if (event == "telemetry") {
+          cout<<"enter"<<endl;
           // j[1] is the data JSON object
           
         	// Main car's localization Data
@@ -245,6 +248,40 @@ int main() {
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
           	int prev_size = previous_path_x.size();
+
+            // Sensor fusion
+            if(prev_size > 0)
+            {
+              car_s = end_path_s;
+            }
+
+            bool too_close = false;
+
+            for(int i = 0; i < sensor_fusion.size(); i++)
+            {
+              // car is in my lane, 6th index is d value
+              float d = sensor_fusion[i][6];
+              //check if this d is within your lane
+              //finds a 4m region
+              if(d < (2+4*lane+2) && d > (2+4*lane-2))
+              {
+                // if within lane check velocity
+                double vx = sensor_fusion[i][3];
+                double vy = sensor_fussion[i][4];
+                double check_speed = sqrt(vx*vx+vy*vy);
+                double check_car_s = sensor_fusion[i][5];
+
+                check_car_s += ((double)prev_size* 0.02 * check_speed);
+
+                if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+                {
+                  ref_vel = 29.5;
+                }
+              }
+
+            }
+
+            // Sensor fusion END
 
           	json msgJson;
 
@@ -328,8 +365,14 @@ int main() {
           	tk::spline s;
 
           	// DEBUG
-          	for (std::vector<double>::const_iterator i = ptsx.begin(); i != ptsx.end(); ++i)
-    			std::cout << *i << ' ';
+            if(DEBUG == true)
+            {
+              cout<<"prev_size"<<prev_size<<endl;
+              cout<<"ptsx: ";
+              for (std::vector<double>::const_iterator i = ptsx.begin(); i != ptsx.end(); ++i)
+                std::cout << *i << ' ';
+            }
+            
 
           	// set XY points to the spline
           	s.set_points(ptsx, ptsy);
@@ -346,13 +389,14 @@ int main() {
           	// calculate for N
           	double target_x = 30.0; // horizon
           	double target_y = s(target_x); 
-          	double target_dist = sqrt(pow(target_x,2)+pow(target_y,2));
+          	//double target_dist = sqrt(pow(target_x,2)+pow(target_y,2));
+            double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
 
           	double x_add_on = 0;
 
-          	for(int i = 1; i < 50 - prev_size; i++)
+          	for(int i = 1; i <= 50 - previous_path_x.size(); i++)
           	{
-          		double N = (target_dist/(0.2*ref_vel/2.24));
+          		double N = (target_dist/(0.02*ref_vel/2.24));
           		double x_point = x_add_on + (target_x)/N;
           		double y_point = s(x_point);
 
@@ -365,11 +409,11 @@ int main() {
           		x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
           		y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
 				
-				x_point += ref_x;
-				y_point += ref_y;
+      				x_point += ref_x;
+      				y_point += ref_y;
 
-				next_x_vals.push_back(x_point);
-				next_y_vals.push_back(y_point);
+      				next_x_vals.push_back(x_point);
+      				next_y_vals.push_back(y_point);
 
           	}
 
