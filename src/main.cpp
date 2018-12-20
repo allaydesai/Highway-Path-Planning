@@ -12,7 +12,7 @@
 
 using namespace std;
 
-bool DEBUG = false;
+
 
 // for convenience
 using json = nlohmann::json;
@@ -207,9 +207,9 @@ int main() {
   int lane = 1;
 
   // reference velocity
-  double ref_vel = 49.5; //mph
+  double ref_vel = 0; //mph
 
-  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &DEBUG](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -226,8 +226,9 @@ int main() {
         string event = j[0].get<string>();
         
         if (event == "telemetry") {
-          cout<<"enter"<<endl;
-          // j[1] is the data JSON object
+        	bool DEBUG = false;
+          	//cout<<"enter"<<endl;
+          	// j[1] is the data JSON object
           
         	// Main car's localization Data
           	double car_x = j[1]["x"];
@@ -256,6 +257,7 @@ int main() {
             }
 
             bool too_close = false;
+            //smallest_gap_s = 99999;
 
             for(int i = 0; i < sensor_fusion.size(); i++)
             {
@@ -267,19 +269,38 @@ int main() {
               {
                 // if within lane check velocity
                 double vx = sensor_fusion[i][3];
-                double vy = sensor_fussion[i][4];
+                double vy = sensor_fusion[i][4];
                 double check_speed = sqrt(vx*vx+vy*vy);
                 double check_car_s = sensor_fusion[i][5];
-
+                // check if car is too close
+                // projecting s value outwards in time
                 check_car_s += ((double)prev_size* 0.02 * check_speed);
-
+                // if in front and gap less than 30m
                 if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
                 {
-                  ref_vel = 29.5;
+                  	//ref_vel = 29.5;
+                	too_close = true;
+
+                	if(lane > 0)
+                	{
+                		lane = 0;
+                	}
+                	//else
+                	//else if(lane )
                 }
               }
 
             }
+
+            // if(too_close)
+            // {
+            // 	ref_vel -= 0.224;  //5 m/sec^2
+            // }
+            // else if(ref_vel < 49.5)
+            // {
+            // 	ref_vel += 0.224;
+            // }
+
 
             // Sensor fusion END
 
@@ -396,6 +417,14 @@ int main() {
 
           	for(int i = 1; i <= 50 - previous_path_x.size(); i++)
           	{
+          		if(too_close)
+	            {
+	            	ref_vel -= 0.224;  //5 m/sec^2
+	            }
+	            else if(ref_vel < 49.5)
+	            {
+	            	ref_vel += 0.224;
+	            }
           		double N = (target_dist/(0.02*ref_vel/2.24));
           		double x_point = x_add_on + (target_x)/N;
           		double y_point = s(x_point);
@@ -409,11 +438,11 @@ int main() {
           		x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
           		y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
 				
-      				x_point += ref_x;
-      				y_point += ref_y;
+  				x_point += ref_x;
+  				y_point += ref_y;
 
-      				next_x_vals.push_back(x_point);
-      				next_y_vals.push_back(y_point);
+  				next_x_vals.push_back(x_point);
+  				next_y_vals.push_back(y_point);
 
           	}
 
