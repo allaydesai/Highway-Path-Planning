@@ -89,43 +89,10 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
   return closestWaypoint;
 }
 
-// int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y, vector<double> maps_dx, vector<double> maps_dy)
-// {
-
-// 	int closestWaypoint = ClosestWaypoint(x,y,maps_x,maps_y);
-
-// 	double map_x = maps_x[closestWaypoint];
-// 	double map_y = maps_y[closestWaypoint];
-
-// 	//heading vector
-//     double hx = map_x-x;
-//     double hy = map_y-y;
-    
-//     //Normal vector:
-//     double nx = maps_dx[closestWaypoint];
-//     double ny = maps_dy[closestWaypoint];
-    
-//     //Vector into the direction of the road (perpendicular to the normal vector)
-//     double vx = -ny;
-//     double vy = nx;
-
-//     //If the inner product of v and h is positive then we are behind the waypoint so we do not need to
-//     //increment closestWaypoint, otherwise we are beyond the waypoint and we need to increment closestWaypoint.
-
-//     double inner = hx*vx+hy*vy;
-//     if (inner<0.0) {
-//         closestWaypoint++;
-//     }
-
-//     return closestWaypoint;
-// }
-
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
 vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
-//vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y,vector<double> maps_dx, vector<double> maps_dy)
 {
 	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
-	//int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y, maps_dx, maps_dy);
 
 	int prev_wp;
 	prev_wp = next_wp-1;
@@ -217,6 +184,7 @@ int main() {
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
   string line;
+
   while (getline(in_map_, line)) {
   	istringstream iss(line);
   	double x;
@@ -240,10 +208,7 @@ int main() {
   int lane = 1;
   int lane_change_wp = 0;
 
-  // reference velocity
-  double ref_vel = 49.5; //mph
-
-  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane ,&lane_change_wp](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane ,&lane_change_wp](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -261,8 +226,7 @@ int main() {
         
         if (event == "telemetry") {
         	bool DEBUG = false;
-          // always assign max speed as reference speed
-          ref_vel = 49.5;
+          
           	//cout<<"enter"<<endl;
           	// j[1] is the data JSON object
           
@@ -290,6 +254,22 @@ int main() {
             double ref_x = car_x;
             double ref_y = car_y;
             double ref_yaw = deg2rad(car_yaw);
+
+            // CONFIG parameters
+            double MAX_VELOCITY_IN_MPH = 49.5;
+            double GAP_REF_DISTANCE_IN_M = 30;
+            double MIN_GAP_DISTANCE_IN_M = 20;
+            double CYCLE_TIME_IN_S = 0.02; //20ms
+            double M_PER_SEC_TO_MILES_PER_HOUR = 2.237;
+            double VELOCITY_RAMP = 0.224; //5 m/sec^2
+            double NO_OF_POINT_PATH = 50;
+
+            // always assign max speed as reference speed
+            double ref_vel = MAX_VELOCITY_IN_MPH;
+            bool too_close = false;
+            double smallest_gap_s = 99999;
+            bool change_lane = false;
+
           	
 
             // Sensor fusion
@@ -298,9 +278,7 @@ int main() {
               car_s = end_path_s;
             }
 
-            bool too_close = false;
-            double smallest_gap_s = 99999;
-            bool change_lane = false;
+            
 
             for(int i = 0; i < sensor_fusion.size(); i++)
             {
@@ -317,9 +295,9 @@ int main() {
                 double check_car_s = sensor_fusion[i][5];
                 // check if car is too close
                 // projecting s value outwards in time
-                check_car_s += ((double)prev_size* 0.02 * check_speed);
+                check_car_s += ((double)prev_size* CYCLE_TIME_IN_S * check_speed);
                 // if in front and gap less than 30m
-                if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+                if((check_car_s > car_s) && ((check_car_s - car_s) < GAP_REF_DISTANCE_IN_M))
                 {
                   	// check to see if this is the smallest gap found so far
                 	if((check_car_s - car_s) < smallest_gap_s)
@@ -327,47 +305,25 @@ int main() {
                 		//keep track of the smallest gap
                 		smallest_gap_s = (check_car_s - car_s);
 
-                		if(smallest_gap_s > 20)
+                		if(smallest_gap_s > MIN_GAP_DISTANCE_IN_M)
                 		{
                 			// matching the car's speed
-                			ref_vel = check_speed * 2.237;
+                			ref_vel = check_speed * M_PER_SEC_TO_MILES_PER_HOUR;
                 			change_lane = true;
                 		}
                 		else
                 		{
                 			// too close, go slower to create some gap
                       too_close = true;
-                			ref_vel = check_speed*2.237 - 5;
+                			ref_vel = (check_speed * M_PER_SEC_TO_MILES_PER_HOUR) - 5;
                 			change_lane = true;
                 		}
                 	}
 
-
-
-                  	//ref_vel = 29.5;
-                	// too_close = true;
-
-                	// if(lane > 0)
-                	// {
-                	// 	lane = 0;
-                	// }
-                	//else
-                	//else if(lane )
                 }
               }
 
             }
-
-            // if(too_close)
-            // {
-            // 	ref_vel -= 0.224;  //5 m/sec^2
-            // }
-            // else if(ref_vel < 49.5)
-            // {
-            // 	ref_vel += 0.224;
-            // }
-
-            // TEST -----------------------------
 
             // look for the next waypoint
             int next_wp = -1;
@@ -393,11 +349,9 @@ int main() {
 
               car_s = end_path_s;
 
-              car_speed = (sqrt((ref_x-ref_x_prev) * (ref_x-ref_x_prev) + (ref_y-ref_y_prev) * (ref_y-ref_y_prev)) / 0.02) * 2.237;
+              car_speed = (sqrt((ref_x-ref_x_prev) * (ref_x-ref_x_prev) + (ref_y-ref_y_prev) * (ref_y-ref_y_prev)) / CYCLE_TIME_IN_S) * M_PER_SEC_TO_MILES_PER_HOUR;
             }
-            // END TEST ----------------------------
-
-            // TEST END LANE CHANGE ---------------------------
+            
             //try to change lanes if too close to car in front
           	if(change_lane && ((next_wp - lane_change_wp) % map_waypoints_x.size() > 2))
           	{
@@ -410,17 +364,17 @@ int main() {
           			{
           				//car is in left lane
           				float d = sensor_fusion[i][6];
-          				if(d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
+          				if(d < (2 + 4 * (lane - 1) + 2) && d > (2 + 4 * (lane - 1) - 2))
           				{
           					double vx = sensor_fusion[i][3];
           					double vy = sensor_fusion[i][4];
-          					double check_speed = sqrt(vx*vx+vy*vy);
+          					double check_speed = sqrt(vx * vx + vy * vy);
 
           					double check_car_s = sensor_fusion[i][5];
-          					check_car_s += ((double)prev_size*.02*check_speed);
+          					check_car_s += ((double)prev_size * CYCLE_TIME_IN_S * check_speed);
           					double dist_s = check_car_s-car_s;
 
-          					if(dist_s < 20 && dist_s > -20)
+          					if(dist_s < MIN_GAP_DISTANCE_IN_M && dist_s > -MIN_GAP_DISTANCE_IN_M)
           					{
           						lane_safe = false;
           					}
@@ -442,17 +396,17 @@ int main() {
           			{
           				//car is in right lane
           				float d = sensor_fusion[i][6];
-          				if(d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
+          				if(d < ( 2 + 4 * (lane + 1) + 2) && d > (2 + 4 * (lane + 1) - 2))
           				{
           					double vx = sensor_fusion[i][3];
           					double vy = sensor_fusion[i][4];
           					double check_speed = sqrt(vx*vx+vy*vy);
 
           					double check_car_s = sensor_fusion[i][5];
-          					check_car_s+=((double)prev_size*.02*check_speed);
+          					check_car_s+=((double)prev_size * CYCLE_TIME_IN_S * check_speed);
           					double dist_s = check_car_s-car_s;
 
-          					if(dist_s < 20 && dist_s > -10)
+          					if(dist_s < MIN_GAP_DISTANCE_IN_M && dist_s > -10) //-10
           					{
           						lane_safe = false;
           					}
@@ -553,6 +507,8 @@ int main() {
               cout<<"ptsx: ";
               for (std::vector<double>::const_iterator i = ptsx.begin(); i != ptsx.end(); ++i)
                 std::cout << *i << ' ';
+
+              cout<<"car coordinates: "<<car_s<<car_d;
             }
             
 
@@ -569,25 +525,25 @@ int main() {
           	// calculating break up of spline points
           	// velocity setting formula: N * 0.02 sec * vel m/sec = d
           	// calculate for N
-          	double target_x = 30.0; // horizon
+          	double target_x = GAP_REF_DISTANCE_IN_M; // horizon
           	double target_y = s(target_x); 
           	//double target_dist = sqrt(pow(target_x,2)+pow(target_y,2));
             double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
 
           	double x_add_on = 0;
 
-          	for(int i = 1; i <= 50 - previous_path_x.size(); i++)
+          	for(int i = 1; i <= NO_OF_POINT_PATH - previous_path_x.size(); i++)
           	{
           		if(ref_vel < car_speed)
 	            {
-	            	car_speed -= 0.224;  //5 m/sec^2
+	            	car_speed -= VELOCITY_RAMP;  //5 m/sec^2
 	            }
 	            else if(ref_vel > car_speed)
 	            {
-	            	car_speed += 0.224;
+	            	car_speed += VELOCITY_RAMP;
 	            }
 
-          		double N = (target_dist / (0.02 * car_speed / 2.24));
+          		double N = (target_dist / (CYCLE_TIME_IN_S * car_speed / M_PER_SEC_TO_MILES_PER_HOUR));
           		double x_point = x_add_on + (target_x) / N;
           		double y_point = s(x_point);
 
