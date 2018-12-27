@@ -8,6 +8,14 @@ Overview
 
 ---
 
+[//]: # (Image References)
+
+[video]: ./imgs/path_planning_final.gif "Video showing planning in action"
+[plan_proc]: ./imgs/planning_process.PNG "Planning Process"
+[result]: ./imgs/result.PNG "Result"
+
+![alt text][video]
+
 This project is a C++ implementation of a path planning module in a self driving car that creates smooth, safe trajectories for the car to follow. The module is used to guide the controller of a vehicle to move around a fixed map of waypoints. The map is off cars driving in a highway environment, all going different speeds, but approximately obeying the 50 MPH speed limit. Data pertaining to localization of the "ego" car and all other car's in the surrounding proximity is provided by the simulator. The car transmits its location, along with its sensor fusion data, which estimates the location of all the vehicles on the same side of the road.
 
 The goal of this project is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. Car's localization and sensor fusion data is provided, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
@@ -31,7 +39,8 @@ The car moves from point to point perfectly and every 20 ms the car moves to the
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
 
-#### The map of the highway is in data/highway_map.txt
+The map of the highway is in data/highway_map.txt
+
 Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
 
 The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
@@ -92,6 +101,8 @@ the path has processed since last time.
 
 Role of the path planner module in a sefl driving car is to evaluate data computed from localization module and the sensor fusion module to generate potential trajectories which are evaluated in order to find the one that minimizes a set of cost functions that lead to an efficient and safe movement towards goal. 
 
+![alt text][plan_proc]
+
 The process of path planning is divided into 3 steps:
 * Prediction: Predicts movement of surrounding objects 
 * Behavior: Generates a plan considering the environments, predictions and goal.
@@ -121,9 +132,16 @@ The velocity of the car is varied in the final step before loading the new path 
 |VELOCITY_RAMP                |0.224|5 m/sec^2  |
 |NO_OF_POINT_PATH             |50   | unit      |
 
+## Result
+
+The goals defined above were acheived and the car succesfully completed a loop of about 4.32 miles without and incidents.
+
+![alt text][result]
+
 ## Future Improvements 
 
 There are several areas of improvement possible in future. I pointed out some while describing the planning process. Current organization of the code is not optimum and due to time constraints I was unable to split it into respective header files. Further currently I dont have cost functions for desired behavior. Adding cost functions that help follow traffic rules and selection of lanes better would help a great deal. When considering lane change currently I only consider the adjacent lane so if I am in lane 1, lane 3 would not be considered. Finally, Currently behavior planning and trajectory generation runs in the same time cycle which may not be the best choice. This planner is a basic implementation and there are various attributes that can be added to make it more robus and inclusive of real life scenarios. 
+
 
 ---
 Getting Started
