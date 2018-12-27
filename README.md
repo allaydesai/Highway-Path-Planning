@@ -111,6 +111,22 @@ Once the target lane is chosen the trajectory is generated using the help of spl
 
 The velocity of the car is varied in the final step before loading the new path points in respective varaibles '''next_x_vals''' and '''next_y_vals'''. This is acheived by comparing the current '''car_speed''' with the '''ref_vel''' and then incrementing or decrementing the car speed by the velocity ramp. 
 
+|        PARAMETERS           |VALUE| UNIT      |
+|-----------------------------|-----|-----------|
+|MAX_VELOCITY_IN_MPH          |49.5 | m         |
+|GAP_REF_DISTANCE_IN_M        |30   | m         |
+|MIN_GAP_DISTANCE_IN_M        |20   | m         |
+|CYCLE_TIME_IN_S              |0.02 | 20ms      |
+|M_PER_SEC_TO_MILES_PER_HOUR  |2.237| unit      |
+|VELOCITY_RAMP                |0.224|5 m/sec^2  |
+|NO_OF_POINT_PATH             |50   | unit      |
+
+## Future Improvements 
+
+There are several areas of improvement possible in future. I pointed out some while describing the planning process. Current organization of the code is not optimum and due to time constraints I was unable to split it into respective header files. Further currently I dont have cost functions for desired behavior. Adding cost functions that help follow traffic rules and selection of lanes better would help a great deal. When considering lane change currently I only consider the adjacent lane so if I am in lane 1, lane 3 would not be considered. Finally, Currently behavior planning and trajectory generation runs in the same time cycle which may not be the best choice. This planner is a basic implementation and there are various attributes that can be added to make it more robus and inclusive of real life scenarios. 
+
+---
+Getting Started
 ---
 ## Basic Build Instructions
 
